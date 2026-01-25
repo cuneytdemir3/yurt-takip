@@ -18,7 +18,7 @@ import time
 st.set_page_config(page_title="Yurt Takip Pro", page_icon="🏫", layout="wide")
 
 # --- GÜVENLİK VE LINK ---
-ADMIN_SIFRESI = "1234" # Şifreni buraya yaz
+
 SHEET_LINKI = "https://docs.google.com/spreadsheets/d/14vue2y63WXYE6-uXqtiEUgGU-yVrBCJy6R6Nj_EdyMI/edit?gid=0#gid=0" # KENDİ LİNKİNİ UNUTMA!
 
 # --- CSS TASARIM ---
@@ -283,3 +283,4 @@ elif menu=="➕ Öğrenci Ekle":
              yeni = pd.DataFrame([{"Ad Soyad":nm,"Numara":no,"Oda No":od,"Durum":"Yurtta","İzin Durumu":"İzin Var","Etüd":"⚪","Yat":"⚪","Mesaj Durumu":"-","Veli":vl,"Veli Tel":tl}])
              st.session_state.df = pd.concat([st.session_state.df, yeni], ignore_index=True)
              buluta_kaydet(); st.success("Öğrenci eklendi!")
+
