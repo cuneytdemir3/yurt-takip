@@ -18,8 +18,8 @@ import time
 st.set_page_config(page_title="Yurt Takip Pro", page_icon="🏫", layout="wide")
 
 # --- GÜVENLİK VE LINK ---
-ADMIN_SIFRESI = st.secrets["genel"]["admin_sifresi"]
-SHEET_LINKI = "https://docs.google.com/spreadsheets/d/14vue2y63WXYE6-uXqtiEUgGU-yVrBCJy6R6Nj_EdyMI/edit?gid=0#gid=0" # KENDİ LİNKİNİ UNUTMA!
+# Linkini buraya yapıştır:
+SHEET_LINKI = "https://docs.google.com/spreadsheets/d/14vue2y63WXYE6-uXqtiEUgGU-yVrBCJy6R6Nj_EdyMI/edit?gid=0#gid=0" 
 
 # --- CSS TASARIM ---
 st.markdown("""
@@ -38,14 +38,21 @@ st.markdown("""
 
 PASTEL_RENKLER = ["#FFEBEE", "#E3F2FD", "#E8F5E9", "#FFF3E0", "#F3E5F5", "#E0F7FA", "#FFFDE7", "#FBE9E7", "#ECEFF1", "#FCE4EC"]
 
-# --- GİRİŞ KONTROLÜ ---
+# --- GİRİŞ KONTROLÜ (GÜVENLİ MOD) ---
 def giris_kontrol():
+    # Şifreyi Belirle (İnternetteyse Kasadan, Bilgisayardaysa Elle)
+    try:
+        GERCEK_SIFRE = st.secrets["genel"]["admin_sifresi"]
+    except:
+        GERCEK_SIFRE = "1234" # Bilgisayarda veya kasa yoksa bu şifre geçerli
+
     if "giris_yapildi" not in st.session_state: st.session_state.giris_yapildi = False
+    
     if not st.session_state.giris_yapildi:
         st.header("🔒 Yurt Yönetim Paneli")
         sifre = st.text_input("Giriş Şifresi:", type="password")
         if st.button("Giriş Yap"):
-            if sifre == ADMIN_SIFRESI:
+            if sifre == GERCEK_SIFRE:
                 st.session_state.giris_yapildi = True
                 st.success("Giriş Başarılı!")
                 time.sleep(0.5)
@@ -57,7 +64,6 @@ def giris_kontrol():
 if not giris_kontrol(): st.stop()
 
 # --- 2. VERİTABANI BAĞLANTISI (AKILLI HİBRİT MOD) ---
-# --- 2. VERİTABANI BAĞLANTISI (DEDEKTİF MODU 🕵️) ---
 def get_client():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     
@@ -66,23 +72,16 @@ def get_client():
     yerel_dosya = os.path.join(klasor, "anahtar.json")
     
     if os.path.exists(yerel_dosya):
+        # Bilgisayardaysan bunu kullan
         return gspread.authorize(Credentials.from_service_account_file(yerel_dosya, scopes=scope))
     else:
-        # 2. ADIM: İnternet Modu (HATA AYIKLAMA)
+        # 2. ADIM: İnternetteysen (Streamlit Cloud) gizli ayarlara bak
         try:
-            # KONTROL 1: Ana başlık var mı?
-            if "gcp_service_account" not in st.secrets:
-                st.error("🚨 HATA: Secrets kutusunda '[gcp_service_account]' başlığı yok!")
-                st.info(f"Mevcut Başlıklar: {list(st.secrets.keys())}")
-                st.warning("Lütfen Secrets ayarlarının en başına [gcp_service_account] yazıp yazmadığını kontrol et.")
-                st.stop()
-            
-            # KONTROL 2: Bilgiler okunabiliyor mu?
             creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
             return gspread.authorize(creds)
-            
         except Exception as e:
-            st.error(f"🚨 TEKNİK HATA: {e}")
+            st.error("🚨 BAĞLANTI HATASI: Secrets ayarları okunamadı!")
+            st.warning("Lütfen Secrets kutusunun en başında [gcp_service_account] yazdığından emin olun.")
             st.stop()
 
 def get_main_sheet():
@@ -198,15 +197,15 @@ if menu=="📋 Yoklama Listesi":
     ara = st.text_input("🔍 İsim veya Oda No Ara")
     f_df = st.session_state.df[st.session_state.df.astype(str).apply(lambda x: x.str.contains(ara, case=False)).any(axis=1)] if ara else st.session_state.df
     
-    # --- BAŞLIKLAR (DÜZELTİLDİ) ---
+    # --- BAŞLIKLAR ---
     col_spec = [2.8, 1.2, 1.2, 1.2, 1.2, 1.2, 1.8, 0.5]
     h1, h2, h3, h4, h5, h6, h7, h8 = st.columns(col_spec)
     h1.caption("Öğrenci Bilgisi")
     h2.caption("Oda")
     h3.caption("Genel Durum")
     h4.caption("İzin")
-    h5.caption("Etüd Yoklama") # Yazı Geri Geldi
-    h6.caption("Yat Yoklama")  # Yazı Geri Geldi
+    h5.caption("Etüd Yoklama") 
+    h6.caption("Yat Yoklama") 
     h7.caption("Mesaj")
     h8.caption("Sil")
 
@@ -289,6 +288,5 @@ elif menu=="➕ Öğrenci Ekle":
              yeni = pd.DataFrame([{"Ad Soyad":nm,"Numara":no,"Oda No":od,"Durum":"Yurtta","İzin Durumu":"İzin Var","Etüd":"⚪","Yat":"⚪","Mesaj Durumu":"-","Veli":vl,"Veli Tel":tl}])
              st.session_state.df = pd.concat([st.session_state.df, yeni], ignore_index=True)
              buluta_kaydet(); st.success("Öğrenci eklendi!")
-
 
 
