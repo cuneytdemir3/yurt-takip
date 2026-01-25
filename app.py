@@ -57,6 +57,7 @@ def giris_kontrol():
 if not giris_kontrol(): st.stop()
 
 # --- 2. VERİTABANI BAĞLANTISI (AKILLI HİBRİT MOD) ---
+# --- 2. VERİTABANI BAĞLANTISI (DEDEKTİF MODU 🕵️) ---
 def get_client():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     
@@ -65,19 +66,24 @@ def get_client():
     yerel_dosya = os.path.join(klasor, "anahtar.json")
     
     if os.path.exists(yerel_dosya):
-        # Bilgisayardaysan bunu kullan
-        creds = Credentials.from_service_account_file(yerel_dosya, scopes=scope)
+        return gspread.authorize(Credentials.from_service_account_file(yerel_dosya, scopes=scope))
     else:
-        # 2. ADIM: İnternetteysen (Streamlit Cloud) gizli ayarlara bak
+        # 2. ADIM: İnternet Modu (HATA AYIKLAMA)
         try:
-            creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-        except:
-            st.error("🚨 KRİTİK HATA: Bağlantı anahtarı bulunamadı!")
-            st.info("Bilgisayardaysan: 'anahtar.json' dosyası app.py yanında olmalı.")
-            st.info("İnternetteysen: Streamlit Secrets ayarları yapılmalı.")
-            st.stop()
+            # KONTROL 1: Ana başlık var mı?
+            if "gcp_service_account" not in st.secrets:
+                st.error("🚨 HATA: Secrets kutusunda '[gcp_service_account]' başlığı yok!")
+                st.info(f"Mevcut Başlıklar: {list(st.secrets.keys())}")
+                st.warning("Lütfen Secrets ayarlarının en başına [gcp_service_account] yazıp yazmadığını kontrol et.")
+                st.stop()
             
-    return gspread.authorize(creds)
+            # KONTROL 2: Bilgiler okunabiliyor mu?
+            creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+            return gspread.authorize(creds)
+            
+        except Exception as e:
+            st.error(f"🚨 TEKNİK HATA: {e}")
+            st.stop()
 
 def get_main_sheet():
     return get_client().open_by_url(SHEET_LINKI).sheet1
@@ -283,5 +289,6 @@ elif menu=="➕ Öğrenci Ekle":
              yeni = pd.DataFrame([{"Ad Soyad":nm,"Numara":no,"Oda No":od,"Durum":"Yurtta","İzin Durumu":"İzin Var","Etüd":"⚪","Yat":"⚪","Mesaj Durumu":"-","Veli":vl,"Veli Tel":tl}])
              st.session_state.df = pd.concat([st.session_state.df, yeni], ignore_index=True)
              buluta_kaydet(); st.success("Öğrenci eklendi!")
+
 
 
