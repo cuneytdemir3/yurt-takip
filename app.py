@@ -270,5 +270,3 @@ elif menu == "➕ Öğrenci Ekle":
              yeni = pd.DataFrame([{"Ad Soyad":nm,"Numara":no,"Oda No":od,"Durum":"Yurtta","İzin Durumu":"İzin Var","Etüd":"⚪","Yat":"⚪","Mesaj Durumu":"-","Veli":vl,"Veli Tel":tl}])
              st.session_state.df = pd.concat([st.session_state.df, yeni], ignore_index=True)
              buluta_kaydet(); st.success("Eklendi!")
-
-
