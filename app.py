@@ -14,22 +14,17 @@ import os
 from datetime import datetime
 import time
 
-# --- MOBİL AYARLAR ---
-st.set_page_config(page_title="Yurt Mobil", page_icon="📱", layout="centered")
+# --- 1. AYARLAR ---
+st.set_page_config(page_title="Yurt Takip Mobil", page_icon="📱", layout="centered") 
+# Not: Layout 'centered' yaptık ki mobilde daha derli toplu dursun.
 
-# --- LİNK AYARI ---
-SHEET_LINKI = "https://docs.google.com/spreadsheets/d/14vue2y63WXYE6-uXqtiEUgGU-yVrBCJy6R6Nj_EdyMI/edit?gid=0#gid=0"
+# --- GÜVENLİK VE LINK ---
+SHEET_LINKI = "https://docs.google.com/spreadsheets/d/BURAYA_LINKINI_YAPISTIR/edit" 
 
-# --- RENK PALETİ (Her oda için farklı pastel renkler) ---
-RENKLER = [
-    "#FFEBEE", "#E3F2FD", "#E8F5E9", "#FFF3E0", "#F3E5F5", 
-    "#E0F7FA", "#FFFDE7", "#FBE9E7", "#ECEFF1", "#FCE4EC",
-    "#D1C4E9", "#C5CAE9", "#BBDEFB", "#B2DFDB", "#C8E6C9"
-]
-
-# --- MOBİL CSS ---
+# --- CSS TASARIM (MOBİL İÇİN ÖZEL) ---
 st.markdown("""
 <style>
+    /* Butonları mobilde parmakla basılacak kadar büyük yap */
     div[data-testid="stButton"] button {
         width: 100%;
         border-radius: 12px;
@@ -37,58 +32,43 @@ st.markdown("""
         padding: 15px 5px; 
         font-size: 16px;
         font-weight: bold;
-        min-height: 50px;
     }
     div[data-testid="stButton"] button:hover {
+        border-color: #888;
         background-color: #f0f2f6;
-        border-color: #333;
     }
-    a[kind="primary"] {
-        width: 100%;
-        border-radius: 12px;
-        text-align: center;
-        padding: 15px 5px;
-        font-weight: bold;
-        text-decoration: none;
-        display: inline-block;
-        background-color: #25D366 !important;
-        color: white !important;
-        border: none;
-    }
+    /* Expander (Açılır Kutu) başlıklarını güzelleştir */
     .streamlit-expanderHeader {
-        font-size: 17px !important;
-        font-weight: 600 !important;
-        background-color: #ffffff;
-        border: 1px solid #eee;
-        border-radius: 8px;
-        margin-bottom: 5px;
-    }
-    div[role="radiogroup"] {
-        background-color: #f9f9f9;
-        padding: 10px;
+        font-size: 18px !important;
+        font-weight: bold !important;
+        background-color: #f8f9fa;
         border-radius: 10px;
-        justify-content: center;
     }
-    .stSuccess, .stInfo, .stWarning, .stError {
-        padding: 10px;
-        border-radius: 10px;
+    /* Başarı/Hata kutularını mobilde düzelt */
+    .stSuccess, .stInfo, .stWarning {
+        padding: 10px; 
+        border-radius: 8px; 
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- GİRİŞ SİSTEMİ ---
+PASTEL_RENKLER = ["#FFEBEE", "#E3F2FD", "#E8F5E9", "#FFF3E0", "#F3E5F5", "#E0F7FA", "#FFFDE7", "#FBE9E7", "#ECEFF1", "#FCE4EC"]
+
+# --- GİRİŞ KONTROLÜ ---
 def giris_kontrol():
     try: GERCEK_SIFRE = st.secrets["genel"]["admin_sifresi"]
     except: GERCEK_SIFRE = "1234"
 
-    if "mobil_giris" not in st.session_state: st.session_state.mobil_giris = False
+    if "giris_yapildi" not in st.session_state: st.session_state.giris_yapildi = False
     
-    if not st.session_state.mobil_giris:
-        st.markdown("<br><h1 style='text-align: center;'>📱 Mobil Giriş</h1>", unsafe_allow_html=True)
-        sifre = st.text_input("Şifre", type="password", label_visibility="collapsed", placeholder="Şifreyi Girin")
+    if not st.session_state.giris_yapildi:
+        st.markdown("<h2 style='text-align: center;'>🔒 Mobil Giriş</h2>", unsafe_allow_html=True)
+        sifre = st.text_input("Şifre", type="password", label_visibility="collapsed", placeholder="Şifrenizi Girin")
         if st.button("Giriş Yap", type="primary"):
             if sifre == GERCEK_SIFRE:
-                st.session_state.mobil_giris = True
+                st.session_state.giris_yapildi = True
+                st.success("Giriş Başarılı!")
+                time.sleep(0.5)
                 st.rerun()
             else: st.error("Hatalı Şifre!")
         return False
@@ -96,161 +76,198 @@ def giris_kontrol():
 
 if not giris_kontrol(): st.stop()
 
-# --- BAĞLANTI ---
+# --- 2. VERİTABANI BAĞLANTISI ---
 def get_client():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    try:
-        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-        return gspread.authorize(creds)
-    except Exception as e:
-        st.error("🚨 Bağlantı Hatası! Secrets ayarlarını yaptın mı?")
-        st.stop()
+    klasor = os.path.dirname(os.path.abspath(__file__))
+    yerel_dosya = os.path.join(klasor, "anahtar.json")
+    
+    if os.path.exists(yerel_dosya):
+        return gspread.authorize(Credentials.from_service_account_file(yerel_dosya, scopes=scope))
+    else:
+        try:
+            creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+            return gspread.authorize(creds)
+        except Exception as e:
+            st.error("🚨 Bağlantı Hatası: Secrets ayarlarını kontrol et.")
+            st.stop()
 
-def get_sheet(): return get_client().open_by_url(SHEET_LINKI).sheet1
-def get_log():
-    c = get_client(); s = c.open_by_url(SHEET_LINKI)
-    try: return s.worksheet("GECMIS")
-    except: ws = s.add_worksheet("GECMIS", 1000, 12); ws.append_row(["Tarih", "Ad Soyad", "Numara", "Oda No", "Durum", "İzin Durumu", "Etüd", "Yat", "Mesaj Durumu", "Veli", "Veli Tel"]); return ws
+def get_main_sheet(): return get_client().open_by_url(SHEET_LINKI).sheet1
 
-# --- VERİ YÖNETİMİ ---
+def get_log_sheet():
+    client = get_client(); ss = client.open_by_url(SHEET_LINKI)
+    try: return ss.worksheet("GECMIS")
+    except:
+        ws = ss.add_worksheet("GECMIS", 1000, 12)
+        ws.append_row(["Tarih", "Ad Soyad", "Numara", "Oda No", "Durum", "İzin Durumu", "Etüd", "Yat", "Mesaj Durumu", "Veli", "Veli Tel"])
+        return ws
+
+# --- VERİ ÇEKME ---
 if "df" not in st.session_state:
     try:
-        d = get_sheet().get_all_records()
-        st.session_state.df = pd.DataFrame(d) if d else pd.DataFrame(columns=["Ad Soyad", "Numara", "Oda No", "Durum", "İzin Durumu", "Etüd", "Yat", "Mesaj Durumu", "Veli", "Veli Tel"])
+        data = get_main_sheet().get_all_records()
+        if not data: st.session_state.df = pd.DataFrame(columns=["Ad Soyad", "Numara", "Oda No", "Durum", "İzin Durumu", "Etüd", "Yat", "Mesaj Durumu", "Veli", "Veli Tel"])
+        else: st.session_state.df = pd.DataFrame(data)
         for c in ["Ad Soyad", "Numara", "Oda No", "Durum", "İzin Durumu", "Etüd", "Yat", "Mesaj Durumu", "Veli", "Veli Tel"]:
             if c not in st.session_state.df.columns: st.session_state.df[c] = "-"
         st.session_state.df = st.session_state.df.fillna("-")
     except Exception as e: st.error(f"Veri Hatası: {e}"); st.stop()
 
-def kaydet():
-    try: get_sheet().update([st.session_state.df.columns.tolist()] + st.session_state.df.astype(str).values.tolist()); st.toast("✅ Kaydedildi!")
-    except: st.error("Kaydetme Hatası")
-
-def arsivle():
+# --- FONKSİYONLAR ---
+def buluta_kaydet():
     try:
-        t = datetime.now().strftime("%d.%m.%Y"); d = st.session_state.df.copy(); d.insert(0, "Tarih", t)
-        get_log().append_rows(d.astype(str).values.tolist()); st.success(f"✅ {t} Arşivlendi!"); st.balloons()
-    except: st.error("Arşiv Hatası")
+        get_main_sheet().update([st.session_state.df.columns.tolist()] + st.session_state.df.astype(str).values.tolist())
+        st.toast("✅ Kaydedildi!", icon="☁️")
+    except Exception as e: st.error(f"Hata: {e}")
 
-def pdf_yap(df, user):
-    b = BytesIO(); c = canvas.Canvas(b, pagesize=A4); w, h = A4
-    try: pdfmetrics.registerFont(TTFont('Arial', 'C:\\Windows\\Fonts\\arial.ttf')); f = 'Arial'
-    except: f = 'Helvetica'
-    c.setFont(f, 16); c.drawString(40, h-50, "YURT YOKLAMA"); c.setFont(f, 10); c.drawString(40, h-70, f"Tarih: {datetime.now().strftime('%d.%m.%Y')}"); c.drawRightString(w-40, h-70, f"Belletmen: {user}"); c.line(40, h-80, w-40, h-80)
-    data = [["Ad", "No", "Oda", "Drm", "İzin", "Etüd", "Yat", "Msj"]]
+def gunu_bitir():
+    try:
+        bugun = datetime.now().strftime("%d.%m.%Y"); df_log = st.session_state.df.copy(); df_log.insert(0, "Tarih", bugun)
+        get_log_sheet().append_rows(df_log.astype(str).values.tolist())
+        st.success(f"✅ Arşivlendi: {bugun}"); st.balloons()
+    except Exception as e: st.error(f"Hata: {e}")
+
+def create_pdf(df, belletmen):
+    buffer = BytesIO(); c = canvas.Canvas(buffer, pagesize=A4); width, height = A4
+    try: pdfmetrics.registerFont(TTFont('Arial', 'C:\\Windows\\Fonts\\arial.ttf')); font = 'Arial'
+    except: font = 'Helvetica'
+    c.setFont(font, 16); c.drawString(40, height-50, "YURT YOKLAMA LİSTESİ")
+    c.setFont(font, 10); c.drawString(40, height-75, f"Tarih: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+    c.drawRightString(width-40, height-75, f"Belletmen: {belletmen}"); c.line(40, height-85, width-40, height-85)
+    pdf_data = [["Ad Soyad", "No", "Oda", "Durum", "İzin", "Etüd", "Yat", "Mesaj"]]
     for _, r in df.sort_values("Oda No").iterrows():
-        data.append([str(r['Ad Soyad'])[:15], str(r['Numara']), str(r['Oda No']), str(r['Durum'])[0], "-" if r['Durum']=="Yurtta" else str(r['İzin Durumu'])[0], str(r['Etüd']).replace("✅ Var","+").replace("❌ Yok","-").replace("⚪",""), str(r['Yat']).replace("✅ Var","+").replace("❌ Yok","-").replace("⚪",""), "OK" if "Atıldı" in str(r['Mesaj Durumu']) else ""])
-    t = Table(data, colWidths=[90,30,30,30,30,30,30,40]); t.setStyle(TableStyle([('GRID',(0,0),(-1,-1),0.5,colors.black),('FONTNAME',(0,0),(-1,-1),f),('FONTSIZE',(0,0),(-1,-1),8)])); t.wrapOn(c, w, h); t.drawOn(c, 40, h-(100+len(data)*20)); c.save(); b.seek(0); return b
+        durum_txt = str(r['Durum']); izin_txt = "-" if durum_txt=="Yurtta" else str(r['İzin Durumu'])
+        etud_txt = str(r['Etüd']).replace("✅ Var","VAR").replace("❌ Yok","YOK").replace("⚪","-")
+        yat_txt = str(r['Yat']).replace("✅ Var","VAR").replace("❌ Yok","YOK").replace("⚪","-")
+        mesaj_txt = str(r['Mesaj Durumu']).replace("✅ ","")
+        pdf_data.append([str(r['Ad Soyad']), str(r['Numara']), str(r['Oda No']), durum_txt, izin_txt, etud_txt, yat_txt, mesaj_txt])
+    t = Table(pdf_data, colWidths=[100,30,40,50,50,40,40,140])
+    t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.lightgrey),('GRID',(0,0),(-1,-1),0.5,colors.black),('FONTNAME',(0,0),(-1,-1),font),('FONTSIZE',(0,0),(-1,-1),8)]))
+    t.wrapOn(c, width, height); t.drawOn(c, 40, height-(110+len(pdf_data)*20)); c.save(); buffer.seek(0); return buffer
 
-def wp(tel, m):
-    t = str(tel).replace(' ','').lstrip('0').replace('-','').replace('.','').strip()
-    if not t: return None
-    return f"https://wa.me/90{t}?text={urllib.parse.quote(m)}"
+def wp_link(tel, msj):
+    t = str(tel).replace(' ','').lstrip('0').replace('-','').replace('.','')
+    return f"https://wa.me/90{t}?text={urllib.parse.quote(msj)}" if t else "#"
 
-# İşlemler
-def izn(i): st.session_state.df.at[i,"İzin Durumu"]="İzin Yok" if st.session_state.df.at[i,"İzin Durumu"]=="İzin Var" else "İzin Var"
-def ey(i,t): st.session_state.df.at[i,t]={"⚪":"✅ Var","✅ Var":"❌ Yok","❌ Yok":"⚪"}.get(st.session_state.df.at[i,t],"⚪")
-def msj(i,m): st.session_state.df.at[i,"Mesaj Durumu"]=m
+def durum_deg(i): st.session_state.df.at[i,"Durum"]={"Yurtta":"İzinli","İzinli":"Evde","Evde":"Yurtta"}.get(st.session_state.df.at[i,"Durum"],"Yurtta"); st.session_state.df.at[i,"Mesaj Durumu"]="-"
+def izin_deg(i): st.session_state.df.at[i,"İzin Durumu"]="İzin Yok" if st.session_state.df.at[i,"İzin Durumu"]=="İzin Var" else "İzin Var"
+def ey_deg(i,tip): st.session_state.df.at[i,tip]={"⚪":"✅ Var","✅ Var":"❌ Yok","❌ Yok":"⚪"}.get(st.session_state.df.at[i,tip],"⚪")
+def msj_at(i, m):
+    mevcut = str(st.session_state.df.at[i,"Mesaj Durumu"])
+    if mevcut in ["-", "nan"]: son = m
+    elif "Genel" in m: son = m
+    else:
+        e = "Etüd" in mevcut or "Etüd" in m; y = "Yat" in mevcut or "Yat" in m
+        son = "Etüd ve Yat Msj. Atıldı" if e and y else ("Etüd Msj. Atıldı" if e else ("Yat Msj. Atıldı" if y else m))
+    st.session_state.df.at[i,"Mesaj Durumu"] = son
 
-# --- ARAYÜZ ---
-c1, c2 = st.columns([3,1])
-with c1: st.title("📱 Mobil Takip")
-with c2: 
-    if st.button("🔄"): st.cache_data.clear(); st.rerun()
+# --- ARAYÜZ (MOBİL TASARIM) ---
+st.title("📱 Yurt Takip")
 
-menu = st.selectbox("Menü", ["📋 LİSTE", "➕ EKLE", "🗄️ GEÇMİŞ", "📄 PDF"])
+# Üst Butonlar (Yan Yana)
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("☁️ KAYDET", type="primary"): buluta_kaydet()
+with col2:
+    if st.button("🌙 ARŞİVLE"): gunu_bitir()
 
-if menu == "📋 LİSTE":
-    c_kaydet, c_arsiv = st.columns(2)
-    with c_kaydet: 
-        if st.button("☁️ KAYDET", type="primary"): kaydet()
-    with c_arsiv:
-        if st.button("🌙 GÜNÜ BİTİR"): arsivle()
-        
-    ara = st.text_input("🔍 Ara", placeholder="Öğrenci Adı veya Oda No...")
+# Menü (Mobilde Radio Button çok yer kaplar, Selectbox daha iyi)
+menu = st.selectbox("Menü Seçiniz", ["📋 Yoklama Listesi", "🗄️ Geçmiş Kayıtlar", "➕ Öğrenci Ekle", "📄 PDF İndir"])
+
+if menu == "📄 PDF İndir":
+    belletmen = st.text_input("Belletmen Adı")
+    if belletmen:
+        pdf = create_pdf(st.session_state.df, belletmen)
+        st.download_button("⬇️ PDF İndir", pdf, "yoklama.pdf", "application/pdf", type="primary")
+
+if menu == "📋 Yoklama Listesi":
+    ara = st.text_input("🔍 Öğrenci Ara", placeholder="İsim veya Oda No...")
+    
     f_df = st.session_state.df
-    if ara: f_df = f_df[f_df.astype(str).apply(lambda x: x.str.contains(ara, case=False)).any(axis=1)]
-
-    # --- ODA ODA GRUPLAMA MANTIĞI ---
+    if ara:
+        f_df = f_df[f_df.astype(str).apply(lambda x: x.str.contains(ara, case=False)).any(axis=1)]
     
-    # 1. Mevcut odaların listesini al ve sırala
-    oda_listesi = sorted(f_df["Oda No"].unique().tolist(), key=str)
+    st.write(f"**Toplam:** {len(f_df)} Öğrenci")
+    st.divider()
 
-    st.info(f"Toplam: {len(f_df)} Öğrenci / {len(oda_listesi)} Oda")
-    
-    # 2. Her oda için döngü başlat
-    for oda in oda_listesi:
-        # Odaya özel renk belirle (Hash mantığıyla hep aynı odaya aynı renk gelir)
-        oda_renk = RENKLER[hash(str(oda)) % len(RENKLER)]
+    # --- KART GÖRÜNÜMÜ (MOBİL DOSTU) ---
+    for i in f_df.sort_values("Oda No").index:
+        r = f_df.loc[i]
         
-        # ODA BAŞLIĞI (BÖLÜM GİBİ GÖRÜNMESİ İÇİN)
-        st.markdown(f"""
-        <div style="background-color: {oda_renk}; padding: 10px; border-radius: 10px; margin-top: 20px; margin-bottom: 10px; border-left: 5px solid #888; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
-            <h3 style="margin:0; color: #333; font-size: 18px;">🛏️ ODA {oda}</h3>
-        </div>
-        """, unsafe_allow_html=True)
+        # Başlık için İkon Belirle
+        durum_ikon = {"Yurtta": "🟢", "İzinli": "🟡", "Evde": "🔵"}.get(r['Durum'], "⚪")
         
-        # Bu odadaki öğrencileri filtrele
-        oda_ogrencileri = f_df[f_df["Oda No"] == oda]
+        # KART BAŞLIĞI: [Renk] [Oda] - [İsim]
+        baslik = f"{durum_ikon} {r['Oda No']} - {r['Ad Soyad']}"
         
-        # Öğrencileri listele
-        for i in oda_ogrencileri.index:
-            r = f_df.loc[i]
-            ikon = {"Yurtta": "🟢", "İzinli": "🟡", "Evde": "🔵"}.get(r['Durum'], "⚪")
-            
-            # Kart Yapısı
-            with st.expander(f"{ikon} {r['Ad Soyad']}"):
-                
-                # DURUM SEÇİMİ
-                st.caption("Durum:")
-                secenekler = ["Yurtta", "İzinli", "Evde"]
-                try: m_idx = secenekler.index(r['Durum'])
-                except: m_idx = 0
-                
-                yeni = st.radio("D", secenekler, index=m_idx, key=f"rd{i}", horizontal=True, label_visibility="collapsed")
-                if yeni != r['Durum']:
-                    st.session_state.df.at[i, "Durum"] = yeni
-                    st.session_state.df.at[i, "Mesaj Durumu"] = "-"
-                    st.rerun()
-
-                # İŞLEMLER
+        with st.expander(baslik):
+            # 1. SATIR: DURUM VE İZİN
+            c1, c2 = st.columns(2)
+            with c1:
+                st.caption("Genel Durum")
+                if st.button(f"{r['Durum']}", key=f"d{i}", use_container_width=True): durum_deg(i); st.rerun()
+            with c2:
+                st.caption("İzin")
                 if r['Durum'] != "Yurtta":
-                    st.write("")
-                    btn = "primary" if r['İzin Durumu']=="İzin Yok" else "secondary"
-                    lbl = "✅ İzinli (Resmi)" if r['İzin Durumu']=="İzin Var" else "⛔ İzinsiz"
-                    if st.button(lbl, key=f"i{i}", type=btn, use_container_width=True): izn(i); st.rerun()
-                
-                if r['Durum'] != "Yurtta" and (r['Durum']=="İzinli" or r['İzin Durumu']=="İzin Var"):
-                    st.success("İzinli.")
+                    btn_stil = "primary" if r['İzin Durumu']=="İzin Yok" else "secondary"
+                    ikon = "✅ İzinli" if r['İzin Durumu']=="İzin Var" else "⛔ İzinsiz"
+                    if st.button(ikon, key=f"i{i}", type=btn_stil, use_container_width=True): izin_deg(i); st.rerun()
                 else:
-                    st.divider()
-                    c3, c4 = st.columns(2)
-                    with c3:
-                        s = "primary" if "Yok" in str(r['Etüd']) else "secondary"
-                        if st.button(f"Etüd: {r['Etüd']}", key=f"e{i}", type=s, use_container_width=True): ey(i,"Etüd"); st.rerun()
-                    with c4:
-                        s = "primary" if "Yok" in str(r['Yat']) else "secondary"
-                        if st.button(f"Yat: {r['Yat']}", key=f"y{i}", type=s, use_container_width=True): ey(i,"Yat"); st.rerun()
-                    
-                    if "Yok" in str(r['Etüd']) or "Yok" in str(r['Yat']) or (r['Durum']=="Evde" and r['İzin Durumu']=="İzin Yok"):
-                        st.warning(f"Durum: {r['Mesaj Durumu']}")
-                        link = wp(r['Veli Tel'], f"{r['Ad Soyad']} yoklamada yoktur.")
-                        if link: st.link_button("💬 WhatsApp", link, use_container_width=True, type="primary")
-                        else: st.error("No Eksik")
-                        if st.button("✅ Mesaj Attım", key=f"m{i}", use_container_width=True): msj(i, "Msj Atıldı"); st.rerun()
+                    st.info("-")
 
-elif menu == "➕ EKLE":
+            # Yasal Kontrol
+            yasal = r['Durum']!="Yurtta" and (r['Durum']=="İzinli" or r['İzin Durumu']=="İzin Var")
+            
+            if not yasal:
+                st.markdown("---")
+                # 2. SATIR: ETÜD VE YAT
+                c3, c4 = st.columns(2)
+                with c3:
+                    st.caption("📖 Etüd")
+                    stil = "primary" if "Yok" in str(r['Etüd']) else "secondary"
+                    if st.button(str(r['Etüd']), key=f"e{i}", type=stil, use_container_width=True): ey_deg(i,"Etüd"); st.rerun()
+                with c4:
+                    st.caption("🛏️ Yat")
+                    stil = "primary" if "Yok" in str(r['Yat']) else "secondary"
+                    if st.button(str(r['Yat']), key=f"y{i}", type=stil, use_container_width=True): ey_deg(i,"Yat"); st.rerun()
+
+                # 3. SATIR: MESAJ VE WHATSAPP
+                ek = "Yok" in str(r['Etüd']); yk = "Yok" in str(r['Yat']); evk = (r['Durum']=="Evde" and r['İzin Durumu']=="İzin Yok")
+                if evk or ek or yk:
+                    st.markdown("---")
+                    st.warning(f"Durum: {r['Mesaj Durumu']}")
+                    c5, c6 = st.columns(2)
+                    with c5:
+                        if ek: st.link_button("💬 WP (Etüd)", wp_link(r['Veli Tel'], f"Etüd yoklamasında {r['Ad Soyad']} yoktur."), use_container_width=True)
+                        elif yk: st.link_button("💬 WP (Yat)", wp_link(r['Veli Tel'], f"Yat yoklamasında {r['Ad Soyad']} yoktur."), use_container_width=True)
+                        elif evk: st.link_button("💬 WP (Kaçak)", wp_link(r['Veli Tel'], f"{r['Ad Soyad']} izinsiz yurtta yoktur."), use_container_width=True)
+                    with c6:
+                        if st.button("✅ Mesaj Atıldı", key=f"m{i}", use_container_width=True): msj_at(i, "Msj Atıldı"); st.rerun()
+
+            # 4. SATIR: SİL
+            st.markdown("---")
+            if st.button("🗑️ Öğrenciyi Sil", key=f"del{i}", type="secondary", use_container_width=True):
+                st.session_state.df = st.session_state.df.drop(i).reset_index(drop=True)
+                buluta_kaydet()
+                st.rerun()
+
+elif menu == "🗄️ Geçmiş Kayıtlar":
+    st.subheader("Arşiv")
+    try:
+        d = pd.DataFrame(get_log_sheet().get_all_records())
+        if not d.empty:
+            sel = st.selectbox("Tarih Seçin", d["Tarih"].unique())
+            st.dataframe(d[d["Tarih"]==sel], use_container_width=True)
+        else: st.info("Kayıt yok.")
+    except Exception as e: st.error(f"Hata: {e}")
+
+elif menu == "➕ Öğrenci Ekle":
+    st.subheader("Yeni Kayıt")
     with st.form("ekle"):
-        ad=st.text_input("Ad Soyad"); no=st.text_input("No"); oda=st.text_input("Oda")
-        veli=st.text_input("Veli"); tel=st.text_input("Tel")
-        if st.form_submit_button("Kaydet", type="primary"):
-            y = pd.DataFrame([{"Ad Soyad":ad,"Numara":no,"Oda No":oda,"Durum":"Yurtta","İzin Durumu":"İzin Var","Etüd":"⚪","Yat":"⚪","Mesaj Durumu":"-","Veli":veli,"Veli Tel":tel}])
-            st.session_state.df = pd.concat([st.session_state.df, y], ignore_index=True); kaydet(); st.success("Eklendi")
+        nm=st.text_input("Ad Soyad"); no=st.text_input("Numara"); od=st.text_input("Oda No")
+        vl=st.text_input("Veli Adı"); tl=st.text_input("Veli Tel (Başında 0 olmadan)")
+        if st.form_submit_button("Öğrenciyi Kaydet", type="primary"):
+             yeni = pd.DataFrame([{"Ad Soyad":nm,"Numara":no,"Oda No":od,"Durum":"Yurtta","İzin Durumu":"İzin Var","Etüd":"⚪","Yat":"⚪","Mesaj Durumu":"-","Veli":vl,"Veli Tel":tl}])
+             st.session_state.df = pd.concat([st.session_state.df, yeni], ignore_index=True)
+             buluta_kaydet(); st.success("Eklendi!")
 
-elif menu == "🗄️ GEÇMİŞ":
-    try: d=pd.DataFrame(get_log().get_all_records()); st.dataframe(d[d["Tarih"]==st.selectbox("Tarih", d["Tarih"].unique())], use_container_width=True)
-    except: st.info("Kayıt yok")
-
-elif menu == "📄 PDF":
-    u = st.text_input("Belletmen Adı")
-    if u: st.download_button("PDF İndir", pdf_yap(st.session_state.df, u), "yoklama.pdf", "application/pdf", type="primary", use_container_width=True)
