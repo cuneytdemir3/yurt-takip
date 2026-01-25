@@ -19,7 +19,7 @@ st.set_page_config(page_title="Yurt Takip Mobil", page_icon="📱", layout="cent
 # Not: Layout 'centered' yaptık ki mobilde daha derli toplu dursun.
 
 # --- GÜVENLİK VE LINK ---
-SHEET_LINKI = "https://docs.google.com/spreadsheets/d/BURAYA_LINKINI_YAPISTIR/edit" 
+SHEET_LINKI = "https://docs.google.com/spreadsheets/d/14vue2y63WXYE6-uXqtiEUgGU-yVrBCJy6R6Nj_EdyMI/edit?gid=0#gid=0" 
 
 # --- CSS TASARIM (MOBİL İÇİN ÖZEL) ---
 st.markdown("""
@@ -270,4 +270,5 @@ elif menu == "➕ Öğrenci Ekle":
              yeni = pd.DataFrame([{"Ad Soyad":nm,"Numara":no,"Oda No":od,"Durum":"Yurtta","İzin Durumu":"İzin Var","Etüd":"⚪","Yat":"⚪","Mesaj Durumu":"-","Veli":vl,"Veli Tel":tl}])
              st.session_state.df = pd.concat([st.session_state.df, yeni], ignore_index=True)
              buluta_kaydet(); st.success("Eklendi!")
+
 
